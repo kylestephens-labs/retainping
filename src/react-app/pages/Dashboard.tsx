@@ -1,4 +1,4 @@
-import { useAuth } from "@getmocha/users-service/react";
+import { useAuth } from "@/react-app/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Users, Mail, TrendingUp, Zap, MessageCircle, Upload, Plus, X } from "lucide-react";
@@ -45,7 +45,7 @@ export default function Dashboard() {
       } else {
         setError(result.error || 'Failed to fetch dashboard data');
       }
-    } catch (err) {
+    } catch {
       setError('Failed to fetch dashboard data');
     } finally {
       setLoading(false);

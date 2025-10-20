@@ -1,4 +1,4 @@
-import { useAuth } from "@getmocha/users-service/react";
+import { useAuth } from "@/react-app/contexts/AuthContext";
 import { Link, useNavigate, useLocation } from "react-router";
 import { LogOut, Zap, BarChart3, Upload, MessageSquare } from "lucide-react";
 

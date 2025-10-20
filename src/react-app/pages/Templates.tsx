@@ -1,4 +1,4 @@
-import { useAuth } from "@getmocha/users-service/react";
+import { useAuth } from "@/react-app/contexts/AuthContext";
 import { useState, useEffect } from "react";
 import { Plus, MessageCircle, Mail, Edit, Trash2 } from "lucide-react";
 import Navbar from "@/react-app/components/Navbar";

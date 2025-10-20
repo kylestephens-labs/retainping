@@ -1,4 +1,4 @@
-import { useAuth } from "@getmocha/users-service/react";
+import { useAuth } from "@/react-app/contexts/AuthContext";
 import { useState, useRef } from "react";
 import { Upload, FileText, CheckCircle, AlertCircle, Users } from "lucide-react";
 import Papa from "papaparse";
@@ -24,8 +24,8 @@ export default function Import() {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        const parsed = results.data as any[];
-        const processed = parsed.slice(0, 5).map((row: any) => ({
+        const parsed = results.data as Record<string, unknown>[];
+        const processed = parsed.slice(0, 5).map((row: Record<string, unknown>) => ({
           name: row.name || row.Name || null,
           email: row.email || row.Email || null,
           discord_id: row.discord_id || row.Discord_ID || row.discord || null,
@@ -33,8 +33,8 @@ export default function Import() {
         }));
         setPreviewData(processed);
       },
-      error: (error) => {
-        console.error('CSV parsing error:', error);
+      error: () => {
+        console.error('CSV parsing error');
       }
     });
   };
@@ -57,8 +57,8 @@ export default function Import() {
       skipEmptyLines: true,
       complete: async (results) => {
         try {
-          const parsed = results.data as any[];
-          const members = parsed.map((row: any) => ({
+          const parsed = results.data as Record<string, unknown>[];
+          const members = parsed.map((row: Record<string, unknown>) => ({
             name: row.name || row.Name || null,
             email: row.email || row.Email || null,
             discord_id: row.discord_id || row.Discord_ID || row.discord || null,
@@ -83,7 +83,7 @@ export default function Import() {
               fileInputRef.current.value = '';
             }
           }
-        } catch (error) {
+        } catch {
           setImportResult({
             success: false,
             message: 'Failed to import members. Please try again.'

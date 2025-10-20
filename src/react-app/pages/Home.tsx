@@ -1,4 +1,4 @@
-import { useAuth } from "@getmocha/users-service/react";
+import { useAuth } from "@/react-app/contexts/AuthContext";
 import { Zap, Users, MessageCircle, ArrowRight, CheckCircle } from "lucide-react";
 import Navbar from "@/react-app/components/Navbar";
 import ArcadeEmbed from "@/react-app/components/ArcadeEmbed";
