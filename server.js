@@ -13,6 +13,45 @@ const PORT = 5173;
 app.use(cors());
 app.use(express.json());
 
+// Auth endpoints (mock implementations for local development)
+app.get('/api/oauth/google/redirect_url', (req, res) => {
+  const redirectUrl = `http://localhost:5173/auth/callback?code=mock_auth_code_${Date.now()}`;
+  res.json({ redirectUrl });
+});
+
+app.post('/api/sessions', (req, res) => {
+  const { code } = req.body;
+  
+  if (!code) {
+    return res.status(400).json({ error: "No authorization code provided" });
+  }
+
+  const mockSessionToken = `mock_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  res.json({ 
+    success: true,
+    sessionToken: mockSessionToken 
+  });
+});
+
+app.get('/api/users/me', (req, res) => {
+  const mockUser = {
+    id: 'mock_user_123',
+    email: 'demo@example.com',
+    name: 'Demo User',
+    google_user_data: {
+      name: 'Demo User',
+      email: 'demo@example.com'
+    }
+  };
+  
+  res.json(mockUser);
+});
+
+app.get('/api/logout', (req, res) => {
+  res.json({ success: true });
+});
+
 // API Routes
 app.get('/api/dashboard', (req, res) => {
   const stats = {

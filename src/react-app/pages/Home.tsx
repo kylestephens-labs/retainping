@@ -1,4 +1,5 @@
 import { useAuth } from "@/react-app/contexts/AuthContext";
+import { useState } from "react";
 import { Zap, Users, MessageCircle, ArrowRight, CheckCircle } from "lucide-react";
 import Navbar from "@/react-app/components/Navbar";
 import ArcadeEmbed from "@/react-app/components/ArcadeEmbed";
@@ -8,13 +9,24 @@ import DemoMock from "@/react-app/components/DemoMock";
 const ARCADE_DEMO_URL = import.meta.env.VITE_ARCADE_EMBED_URL || "";
 
 export default function Home() {
-  const { user, redirectToLogin } = useAuth();
+  const { user, login } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleTryFree = () => {
+  const handleTryFree = async () => {
     if (user) {
       window.location.href = "/app/dashboard";
     } else {
-      redirectToLogin();
+      setIsLoading(true);
+      try {
+        await login();
+        // Redirect to dashboard after successful login
+        setTimeout(() => {
+          window.location.href = "/app/dashboard";
+        }, 500);
+      } catch (error) {
+        console.error('Login failed:', error);
+        setIsLoading(false);
+      }
     }
   };
 
@@ -44,10 +56,11 @@ export default function Home() {
           <div className="flex flex-col items-center space-y-4 mb-8">
             <button
               onClick={handleTryFree}
-              className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center space-x-2"
+              disabled={isLoading}
+              className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span>Try Free for 7 Days</span>
-              <ArrowRight className="w-5 h-5" />
+              <span>{isLoading ? "Starting Trial..." : "Try Free for 7 Days"}</span>
+              {!isLoading && <ArrowRight className="w-5 h-5" />}
             </button>
             <button
               onClick={scrollToDemo}
