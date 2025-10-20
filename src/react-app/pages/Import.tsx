@@ -52,47 +52,40 @@ export default function Import() {
     
     setImporting(true);
     
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        try {
-          const parsed = results.data as Record<string, unknown>[];
-          const members = parsed.map((row: Record<string, unknown>) => ({
-            name: row.name || row.Name || null,
-            email: row.email || row.Email || null,
-            discord_id: row.discord_id || row.Discord_ID || row.discord || null,
-            last_active_at: row.last_active_at || row.Last_Active || row.last_active || null,
-          }));
-
+    try {
+      // Read the file as text and send raw CSV data
+      const csvText = await file.text();
+      
           const response = await fetch('/api/import', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('supabase_session_token')}`
             },
-            body: JSON.stringify({ members }),
+            body: JSON.stringify({ 
+              csvData: csvText
+            }),
           });
 
-          const result = await response.json();
-          setImportResult(result);
-          
-          if (result.success) {
-            setFile(null);
-            setPreviewData([]);
-            if (fileInputRef.current) {
-              fileInputRef.current.value = '';
-            }
-          }
-        } catch {
-          setImportResult({
-            success: false,
-            message: 'Failed to import members. Please try again.'
-          });
-        } finally {
-          setImporting(false);
+      const result = await response.json();
+      setImportResult(result);
+      
+      if (result.success) {
+        setFile(null);
+        setPreviewData([]);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
         }
-      },
-    });
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      setImportResult({
+        success: false,
+        message: 'Failed to import members. Please try again.'
+      });
+    } finally {
+      setImporting(false);
+    }
   };
 
   const openFilePicker = () => {

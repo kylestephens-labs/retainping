@@ -27,7 +27,12 @@ export default function Templates() {
 
   const fetchTemplates = async () => {
     try {
-      const response = await fetch('/api/templates');
+      const token = localStorage.getItem('supabase_session_token') || 'mock_session_token';
+      const response = await fetch('/api/templates', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       const result = await response.json();
       
       if (result.success) {
@@ -47,11 +52,13 @@ export default function Templates() {
     try {
       const url = editingTemplate ? `/api/templates/${editingTemplate.id}` : '/api/templates';
       const method = editingTemplate ? 'PUT' : 'POST';
+      const token = localStorage.getItem('supabase_session_token') || 'mock_session_token';
 
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(formData),
       });

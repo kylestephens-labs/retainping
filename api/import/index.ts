@@ -44,9 +44,6 @@ export function validateRequiredFields(body: any): { isValid: boolean; error?: s
   if (!body.csvData) {
     return { isValid: false, error: "CSV data is required" };
   }
-  if (!body.user_id) {
-    return { isValid: false, error: "User ID is required" };
-  }
   return { isValid: true };
 }
 
@@ -264,6 +261,28 @@ export async function POST(request: Request): Promise<Response> {
   let userId = '';
   
   try {
+    // Get the session token from the Authorization header
+    const authHeader = request.headers.get('Authorization');
+    const sessionToken = authHeader?.replace('Bearer ', '');
+
+    if (!sessionToken) {
+      return createApiResponse({ 
+        error: "No session token provided" 
+      }, 401);
+    }
+
+    // Verify the session and get user data
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(sessionToken);
+
+    if (authError || !user) {
+      console.error('User verification error:', authError);
+      return createApiResponse({ 
+        error: "Invalid session token" 
+      }, 401);
+    }
+
+    userId = user.id;
+
     const body = await request.json();
     
     // Validate required fields
@@ -272,8 +291,7 @@ export async function POST(request: Request): Promise<Response> {
       return createApiResponse({ error: validation.error }, 400);
     }
 
-    const { csvData, user_id, options = {} } = body;
-    userId = user_id;
+    const { csvData, options = {} } = body;
     const { skipDuplicates = true, batchSize = BATCH_CONFIG.DEFAULT_BATCH_SIZE } = options;
 
     // Rate limiting check

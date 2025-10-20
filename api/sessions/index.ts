@@ -1,3 +1,5 @@
+import { supabaseAdmin } from '../../lib/supabase';
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -9,19 +11,44 @@ export async function POST(request: Request) {
       });
     }
 
-    // Mock session creation - in a real app, this would exchange the code for a real session token
-    const mockSessionToken = `mock_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Exchange the authorization code for a session
+    const { data, error } = await supabaseAdmin.auth.exchangeCodeForSession({
+      auth_code: body.code
+    });
+
+    if (error) {
+      console.error('Session exchange error:', error);
+      return new Response(JSON.stringify({ 
+        error: "Failed to exchange code for session",
+        details: error.message 
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!data.session) {
+      return new Response(JSON.stringify({ error: "No session returned from Supabase" }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Set the session cookie
+    const sessionCookie = `sb-${process.env.SUPABASE_URL?.split('//')[1]?.split('.')[0]}-auth-token=${data.session.access_token}; HttpOnly; Path=/; SameSite=Lax; Secure; Max-Age=${data.session.expires_in}`;
     
     return new Response(JSON.stringify({ 
       success: true,
-      sessionToken: mockSessionToken 
+      sessionToken: data.session.access_token,
+      user: data.user
     }), {
       headers: { 
         'Content-Type': 'application/json',
-        'Set-Cookie': `mocha_session_token=${mockSessionToken}; HttpOnly; Path=/; SameSite=None; Secure; Max-Age=${60 * 24 * 60 * 60}`
+        'Set-Cookie': sessionCookie
       },
     });
-  } catch {
+  } catch (error) {
+    console.error('Session creation error:', error);
     return new Response(JSON.stringify({ error: "Failed to exchange code for session" }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

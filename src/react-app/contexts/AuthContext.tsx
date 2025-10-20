@@ -30,10 +30,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check if user is already logged in
     const savedUser = localStorage.getItem(MOCHA_SESSION_TOKEN_COOKIE_NAME);
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+        
+        // Verify the session is still valid
+        verifySession(parsedUser);
+      } catch (error) {
+        console.error('Error parsing saved user:', error);
+        localStorage.removeItem(MOCHA_SESSION_TOKEN_COOKIE_NAME);
+      }
     }
     setIsLoading(false);
   }, []);
+
+  const verifySession = async (savedUser: User) => {
+    try {
+      const response = await fetch('/api/users/me', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('supabase_session_token')}`
+        }
+      });
+      
+      if (!response.ok) {
+        // Session is invalid, clear user data
+        setUser(null);
+        localStorage.removeItem(MOCHA_SESSION_TOKEN_COOKIE_NAME);
+        localStorage.removeItem('supabase_session_token');
+      }
+    } catch (error) {
+      console.error('Session verification error:', error);
+      setUser(null);
+      localStorage.removeItem(MOCHA_SESSION_TOKEN_COOKIE_NAME);
+      localStorage.removeItem('supabase_session_token');
+    }
+  };
 
   const login = async () => {
     try {
@@ -63,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null);
     localStorage.removeItem(MOCHA_SESSION_TOKEN_COOKIE_NAME);
+    localStorage.removeItem('supabase_session_token');
   };
 
   const exchangeCodeForSessionToken = async () => {
@@ -87,18 +119,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await response.json();
 
       if (result.success) {
+        // Store the session token
+        localStorage.setItem('supabase_session_token', result.sessionToken);
+        
         // Get user info
-        const userResponse = await fetch('/api/users/me');
+        const userResponse = await fetch('/api/users/me', {
+          headers: {
+            'Authorization': `Bearer ${result.sessionToken}`
+          }
+        });
         const userData = await userResponse.json();
         
         const user: User = {
           id: userData.id,
           email: userData.email,
-          name: userData.name || userData.google_user_data?.name || 'User'
+          name: userData.name || userData.google_user_data?.name || 'User',
+          google_user_data: userData.google_user_data
         };
         
         setUser(user);
         localStorage.setItem(MOCHA_SESSION_TOKEN_COOKIE_NAME, JSON.stringify(user));
+        
+        // Clear the URL params
+        window.history.replaceState({}, document.title, window.location.pathname);
       } else {
         throw new Error('Failed to exchange code for session');
       }
