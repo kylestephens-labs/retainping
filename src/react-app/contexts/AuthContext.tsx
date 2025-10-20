@@ -6,6 +6,10 @@ interface User {
   id: string;
   email: string;
   name: string;
+  google_user_data?: {
+    name: string;
+    email: string;
+  };
 }
 
 interface AuthContextType {

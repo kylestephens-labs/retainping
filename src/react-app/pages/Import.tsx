@@ -26,10 +26,10 @@ export default function Import() {
       complete: (results) => {
         const parsed = results.data as Record<string, unknown>[];
         const processed = parsed.slice(0, 5).map((row: Record<string, unknown>) => ({
-          name: row.name || row.Name || null,
-          email: row.email || row.Email || null,
-          discord_id: row.discord_id || row.Discord_ID || row.discord || null,
-          last_active_at: row.last_active_at || row.Last_Active || row.last_active || null,
+          name: (row.name || row.Name || null) as string | null,
+          email: (row.email || row.Email || null) as string | null,
+          discord_id: (row.discord_id || row.Discord_ID || row.discord || null) as string | null,
+          last_active_at: (row.last_active_at || row.Last_Active || row.last_active || null) as string | null,
         }));
         setPreviewData(processed);
       },

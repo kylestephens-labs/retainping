@@ -101,7 +101,7 @@ export default function Dashboard() {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-3xl font-bold">
-                Welcome back, {user.google_user_data.name || user.email.split('@')[0]} — let's keep your subscribers engaged.
+                Welcome back, {user.google_user_data?.name || user.email.split('@')[0]} — let's keep your subscribers engaged.
               </h1>
               <p className="mt-2 opacity-90">
                 Your retention command center

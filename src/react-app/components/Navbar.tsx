@@ -98,9 +98,9 @@ export default function Navbar() {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2 text-sm text-gray-600">
               <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-medium">
-                {user.google_user_data.given_name?.[0] || user.email[0].toUpperCase()}
+                {user.google_user_data?.name?.[0] || user.email[0].toUpperCase()}
               </div>
-              <span className="hidden sm:block">{user.google_user_data.name || user.email}</span>
+              <span className="hidden sm:block">{user.google_user_data?.name || user.email}</span>
             </div>
             <button
               onClick={handleLogout}
