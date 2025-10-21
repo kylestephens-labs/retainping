@@ -12,9 +12,7 @@ export async function POST(request: Request) {
     }
 
     // Exchange the authorization code for a session
-    const { data, error } = await supabaseAdmin.auth.exchangeCodeForSession({
-      auth_code: body.code
-    });
+    const { data, error } = await supabaseAdmin.auth.exchangeCodeForSession(body.code);
 
     if (error) {
       console.error('Session exchange error:', error);

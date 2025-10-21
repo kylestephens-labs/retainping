@@ -10,11 +10,11 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        await exchangeCodeForSessionToken();
-        // Wait a moment for user state to update, then redirect
-        setTimeout(() => {
+        const user = await exchangeCodeForSessionToken();
+        if (user) {
+          // Success - redirect to dashboard
           navigate("/app/dashboard");
-        }, 100);
+        }
       } catch (error) {
         console.error("Auth callback error:", error);
         navigate("/");

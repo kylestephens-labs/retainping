@@ -6,6 +6,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.76.0",
     "@types/papaparse": "^5.3.16",
+    "dotenv": "^17.2.3",
     "lucide-react": "^0.510.0",
     "papaparse": "^5.5.3",
     "react": "19.0.0",

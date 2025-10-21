@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { MOCHA_SESSION_TOKEN_COOKIE_NAME } from '@/react-app/constants/auth';
 
 interface User {
@@ -17,7 +17,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: () => void;
   logout: () => void;
-  exchangeCodeForSessionToken: () => Promise<void>;
+  exchangeCodeForSessionToken: () => Promise<User>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,6 +27,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isAuthCallback = urlParams.has('code');
+
+    if (isAuthCallback) {
+      // We'll exchange the code for a fresh session; skip loading stale data.
+      setIsLoading(false);
+      return;
+    }
+
     // Check if user is already logged in
     const savedUser = localStorage.getItem(MOCHA_SESSION_TOKEN_COOKIE_NAME);
     if (savedUser) {
@@ -35,20 +44,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(parsedUser);
         
         // Verify the session is still valid
-        verifySession(parsedUser);
+        verifySession();
       } catch (error) {
         console.error('Error parsing saved user:', error);
         localStorage.removeItem(MOCHA_SESSION_TOKEN_COOKIE_NAME);
+        localStorage.removeItem('supabase_session_token');
       }
     }
     setIsLoading(false);
   }, []);
 
-  const verifySession = async (savedUser: User) => {
+  const verifySession = async () => {
     try {
+      const sessionToken = localStorage.getItem('supabase_session_token');
+      if (!sessionToken) {
+        setUser(null);
+        localStorage.removeItem(MOCHA_SESSION_TOKEN_COOKIE_NAME);
+        return;
+      }
+
       const response = await fetch('/api/users/me', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('supabase_session_token')}`
+          'Authorization': `Bearer ${sessionToken}`
         }
       });
       
@@ -80,14 +97,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       console.error('Login error:', error);
-      // Fallback to mock login if API fails
-      const mockUser: User = {
-        id: '1',
-        email: 'user@example.com',
-        name: 'Demo User'
-      };
-      setUser(mockUser);
-      localStorage.setItem(MOCHA_SESSION_TOKEN_COOKIE_NAME, JSON.stringify(mockUser));
+      // Don't fallback to mock - let the error propagate
+      throw error;
     }
   };
 
@@ -97,16 +108,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('supabase_session_token');
   };
 
-  const exchangeCodeForSessionToken = async () => {
+  const exchangeCodeForSessionToken = useCallback(async () => {
     try {
       // Get the auth code from URL params
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       
+      console.log('Auth callback - code found:', !!code);
+      
       if (!code) {
         throw new Error('No authorization code found');
       }
 
+      console.log('Exchanging code for session token...');
+      
       // Exchange code for session token
       const response = await fetch('/api/sessions', {
         method: 'POST',
@@ -117,10 +132,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       const result = await response.json();
+      console.log('Session exchange result:', result);
 
       if (result.success) {
         // Store the session token
         localStorage.setItem('supabase_session_token', result.sessionToken);
+        console.log('Session token stored, fetching user data...');
         
         // Get user info
         const userResponse = await fetch('/api/users/me', {
@@ -128,7 +145,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             'Authorization': `Bearer ${result.sessionToken}`
           }
         });
+        
+        if (!userResponse.ok) {
+          throw new Error(`Failed to fetch user data: ${userResponse.status}`);
+        }
+        
         const userData = await userResponse.json();
+        console.log('User data received:', userData);
         
         const user: User = {
           id: userData.id,
@@ -137,26 +160,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           google_user_data: userData.google_user_data
         };
         
+        console.log('Setting user:', user);
         setUser(user);
         localStorage.setItem(MOCHA_SESSION_TOKEN_COOKIE_NAME, JSON.stringify(user));
         
-        // Clear the URL params
+        // Clear the URL params immediately to prevent infinite loop
         window.history.replaceState({}, document.title, window.location.pathname);
+        
+        return user; // Return the user to indicate success
       } else {
-        throw new Error('Failed to exchange code for session');
+        throw new Error(`Failed to exchange code for session: ${result.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Session exchange error:', error);
-      // Fallback to mock login
-      const mockUser: User = {
-        id: '1',
-        email: 'user@example.com',
-        name: 'Demo User'
-      };
-      setUser(mockUser);
-      localStorage.setItem(MOCHA_SESSION_TOKEN_COOKIE_NAME, JSON.stringify(mockUser));
+      // Don't fallback to mock - throw the error so AuthCallback can handle it
+      throw error;
     }
-  };
+  }, []); // Empty dependency array - function should be stable
 
   return (
     <AuthContext.Provider value={{ user, isLoading, login, logout, exchangeCodeForSessionToken }}>

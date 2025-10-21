@@ -19,10 +19,7 @@ export default function Home() {
       setIsLoading(true);
       try {
         await login();
-        // Redirect to dashboard after successful login
-        setTimeout(() => {
-          window.location.href = "/app/dashboard";
-        }, 500);
+        // login() handles the redirect to OAuth, no need for additional redirect
       } catch (error) {
         console.error('Login failed:', error);
         setIsLoading(false);
