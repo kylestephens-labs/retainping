@@ -1,8 +1,12 @@
 import { supabaseAdmin } from '../../lib/supabase';
 
-export async function POST(request: Request) {
+type SessionExchangeRequestBody = {
+  code?: string;
+};
+
+export async function POST(request: Request): Promise<Response> {
   try {
-    const body = await request.json();
+    const body = await request.json() as SessionExchangeRequestBody;
     
     if (!body.code) {
       return new Response(JSON.stringify({ error: "No authorization code provided" }), {
@@ -18,7 +22,7 @@ export async function POST(request: Request) {
       console.error('Session exchange error:', error);
       return new Response(JSON.stringify({ 
         error: "Failed to exchange code for session",
-        details: error.message 
+        details: error instanceof Error ? error.message : 'Unknown error'
       }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
@@ -47,7 +51,10 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('Session creation error:', error);
-    return new Response(JSON.stringify({ error: "Failed to exchange code for session" }), {
+    return new Response(JSON.stringify({ 
+      error: "Failed to exchange code for session",
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });

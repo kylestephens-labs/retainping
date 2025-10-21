@@ -2,26 +2,50 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-export default async function handler(req, res) {
+type TemplateVariables = Record<string, string>;
+
+type SendEmailRequest = {
+  method?: string;
+  body: {
+    to?: string | string[];
+    subject?: string;
+    html?: string;
+    template_variables?: TemplateVariables;
+  };
+};
+
+type SendEmailResponse = {
+  status: (code: number) => SendEmailResponse;
+  json: (payload: Record<string, unknown>) => void;
+};
+
+export default async function handler(req: SendEmailRequest, res: SendEmailResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
   }
 
   try {
-    const { to, subject, html, template_variables = {} } = req.body;
+    const {
+      to,
+      subject,
+      html,
+      template_variables: templateVariables = {},
+    } = req.body ?? {};
 
     // Validate required fields
     if (!to || !subject || !html) {
-      return res.status(400).json({ 
+      res.status(400).json({ 
         error: 'Missing required fields: to, subject, html' 
       });
+      return;
     }
 
     // Replace template variables in subject and html
     let processedSubject = subject;
     let processedHtml = html;
 
-    Object.entries(template_variables).forEach(([key, value]) => {
+    Object.entries(templateVariables).forEach(([key, value]) => {
       const placeholder = `{{${key}}}`;
       processedSubject = processedSubject.replace(new RegExp(placeholder, 'g'), value);
       processedHtml = processedHtml.replace(new RegExp(placeholder, 'g'), value);
@@ -37,32 +61,33 @@ export default async function handler(req, res) {
 
     if (error) {
       console.error('Resend API error:', error);
-      return res.status(500).json({ 
+      res.status(500).json({ 
         error: 'Failed to send email',
-        details: error.message 
+        details: error instanceof Error ? error.message : 'Unknown error'
       });
+      return;
     }
 
     // Log successful send
     console.log('Email sent successfully:', {
-      id: data.id,
+      id: data?.id,
       to: to,
       subject: processedSubject
     });
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       message: 'Email sent successfully',
-      email_id: data.id,
+      email_id: data?.id ?? null,
       to: to,
       subject: processedSubject
     });
 
   } catch (error) {
     console.error('Email sending error:', error);
-    return res.status(500).json({ 
+    res.status(500).json({ 
       error: 'Internal server error',
-      details: error.message 
+      details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 }

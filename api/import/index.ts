@@ -1,6 +1,6 @@
 import Papa from 'papaparse';
 import { supabaseAdmin } from '../../lib/supabase';
-import { MemberSchema, type Member, type ApiResponse } from '../../src/shared/types';
+import { type Member, type ApiResponse } from '../../src/shared/types';
 import { checkRateLimit, logImportActivity } from '../../lib/rate-limiting';
 import { logImportSuccess, logImportError, checkAlerts } from '../../lib/monitoring';
 
@@ -32,16 +32,26 @@ const RATE_LIMIT_CONFIG = {
   MAX_MEMBERS_PER_IMPORT: 10000
 } as const;
 
+type ImportRequestOptions = {
+  skipDuplicates?: boolean;
+  batchSize?: number;
+};
+
+type ImportRequestBody = {
+  csvData?: string;
+  options?: ImportRequestOptions;
+};
+
 // Utility functions
-export function createApiResponse(data: any, status: number = 200): Response {
+export function createApiResponse(data: ApiResponse | Record<string, unknown>, status: number = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
 }
 
-export function validateRequiredFields(body: any): { isValid: boolean; error?: string } {
-  if (!body.csvData) {
+export function validateRequiredFields(body: ImportRequestBody): { isValid: boolean; error?: string } {
+  if (!body.csvData || typeof body.csvData !== 'string') {
     return { isValid: false, error: "CSV data is required" };
   }
   return { isValid: true };
@@ -267,6 +277,7 @@ export async function POST(request: Request): Promise<Response> {
 
     if (!sessionToken) {
       return createApiResponse({ 
+        success: false,
         error: "No session token provided" 
       }, 401);
     }
@@ -277,22 +288,23 @@ export async function POST(request: Request): Promise<Response> {
     if (authError || !user) {
       console.error('User verification error:', authError);
       return createApiResponse({ 
+        success: false,
         error: "Invalid session token" 
       }, 401);
     }
 
     userId = user.id;
 
-    const body = await request.json();
+    const body = await request.json() as ImportRequestBody;
     
     // Validate required fields
     const validation = validateRequiredFields(body);
     if (!validation.isValid) {
-      return createApiResponse({ error: validation.error }, 400);
+      return createApiResponse({ success: false, error: validation.error }, 400);
     }
 
-    const { csvData, options = {} } = body;
-    const { skipDuplicates = true, batchSize = BATCH_CONFIG.DEFAULT_BATCH_SIZE } = options;
+    const { csvData = '', options } = body;
+    const { skipDuplicates = true, batchSize = BATCH_CONFIG.DEFAULT_BATCH_SIZE } = options ?? {};
 
     // Rate limiting check
     const rateLimitResult = await checkRateLimit(
@@ -309,6 +321,7 @@ export async function POST(request: Request): Promise<Response> {
       });
       
       return createApiResponse({ 
+        success: false,
         error: "Rate limit exceeded",
         details: `Maximum ${RATE_LIMIT_CONFIG.MAX_IMPORTS_PER_HOUR} imports per hour`,
         code: 'RATE_LIMITED',
@@ -325,6 +338,7 @@ export async function POST(request: Request): Promise<Response> {
       });
       
       return createApiResponse({ 
+        success: false,
         error: `Import too large. Maximum ${RATE_LIMIT_CONFIG.MAX_MEMBERS_PER_IMPORT} members per import`,
         code: 'IMPORT_TOO_LARGE'
       }, 400);
@@ -343,6 +357,7 @@ export async function POST(request: Request): Promise<Response> {
       await logImportError(userId, 'CSV parsing failed', parseResult.errors);
       
       return createApiResponse({ 
+        success: false,
         error: "Failed to parse CSV data",
         details: parseResult.errors,
         code: 'CSV_PARSE_ERROR'
@@ -353,7 +368,7 @@ export async function POST(request: Request): Promise<Response> {
 
     // Transform and validate member data
     const transformedMembers = members
-      .map(member => transformMemberData(member, user_id))
+      .map(member => transformMemberData(member, userId))
       .filter(validateMemberData);
 
     if (transformedMembers.length === 0) {
@@ -362,6 +377,7 @@ export async function POST(request: Request): Promise<Response> {
       });
       
       return createApiResponse({ 
+        success: false,
         error: "No members with valid email or Discord ID found",
         code: 'NO_VALID_MEMBERS'
       }, 400);
@@ -375,7 +391,7 @@ export async function POST(request: Request): Promise<Response> {
       const emails = transformedMembers.map(m => m.email).filter(Boolean) as string[];
       const discordIds = transformedMembers.map(m => m.discord_id).filter(Boolean) as string[];
       
-      const existingMembers = await getExistingMembers(user_id, emails, discordIds);
+      const existingMembers = await getExistingMembers(userId, emails, discordIds);
       const duplicateResult = filterDuplicates(transformedMembers, existingMembers, skipDuplicates);
       
       membersToInsert = duplicateResult.newMembers;
@@ -389,6 +405,7 @@ export async function POST(request: Request): Promise<Response> {
       });
       
       return createApiResponse({ 
+        success: false,
         error: "All members are duplicates",
         code: 'ALL_DUPLICATES',
         data: {
@@ -408,6 +425,7 @@ export async function POST(request: Request): Promise<Response> {
       });
       
       return createApiResponse({ 
+        success: false,
         error: "Failed to insert members into database",
         details: insertResult.error,
         code: 'DATABASE_ERROR'
@@ -417,7 +435,7 @@ export async function POST(request: Request): Promise<Response> {
     const processingTime = Date.now() - startTime;
 
     // Log successful import
-    console.log(`Successfully imported ${insertResult.totalInserted || 0} members for user ${user_id} in ${insertResult.batchesProcessed || 0} batches (${processingTime}ms)`);
+    console.log(`Successfully imported ${insertResult.totalInserted || 0} members for user ${userId} in ${insertResult.batchesProcessed || 0} batches (${processingTime}ms)`);
 
     // Log success metrics
     await logImportSuccess(userId, {
@@ -466,6 +484,7 @@ export async function POST(request: Request): Promise<Response> {
     
     console.error('Import API error:', error);
     return createApiResponse({ 
+      success: false,
       error: "Internal server error",
       details: error instanceof Error ? error.message : 'Unknown error',
       code: 'INTERNAL_ERROR'

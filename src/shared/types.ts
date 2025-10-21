@@ -99,6 +99,7 @@ export const ApiResponseSchema = z.object({
   success: z.boolean(),
   message: z.string().optional(),
   data: z.any().optional(),
-});
+  error: z.string().optional(),
+}).passthrough();
 
 export type ApiResponse = z.infer<typeof ApiResponseSchema>;

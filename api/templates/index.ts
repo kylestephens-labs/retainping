@@ -1,4 +1,4 @@
-import { TemplateSchema, type Template, type ApiResponse } from '../../src/shared/types';
+import { type Template, type ApiResponse } from '../../src/shared/types';
 
 // Constants
 const VALID_CHANNELS = ['email', 'discord'] as const;
@@ -22,6 +22,8 @@ type TemplateCreateRequest = {
   subject?: string;
   user_id: string;
 };
+
+type TemplateRequestPayload = Partial<Omit<TemplateCreateRequest, 'user_id'>>;
 
 // Lazy load Supabase client to avoid import errors when env vars are missing
 let supabaseAdmin: any = null;
@@ -47,7 +49,7 @@ function createApiResponse(data: ApiResponse, status: number = HTTP_STATUS.OK): 
 }
 
 // Validate template creation request data
-function validateTemplateData(body: any): ValidationResult {
+function validateTemplateData(body: TemplateRequestPayload & { user_id?: string }): ValidationResult {
   const errors: string[] = [];
 
   // Check required fields
@@ -190,7 +192,10 @@ export async function GET(request: Request): Promise<Response> {
 // POST /api/templates - Create a new template
 export async function POST(request: Request): Promise<Response> {
   try {
-    const body = await request.json();
+    const rawBody = await request.json().catch(() => null);
+    const body = (typeof rawBody === 'object' && rawBody !== null
+      ? rawBody
+      : {}) as TemplateRequestPayload;
 
     // Extract user ID from authentication
     const userId = await getUserIdFromRequest(request);
@@ -211,11 +216,26 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
+    if (typeof body.name !== 'string' || typeof body.channel !== 'string' || typeof body.body !== 'string') {
+      return createApiResponse(
+        { success: false, error: 'Invalid template payload' },
+        HTTP_STATUS.BAD_REQUEST
+      );
+    }
+
+    const templateRequest: TemplateCreateRequest = {
+      name: body.name,
+      channel: body.channel,
+      body: body.body,
+      subject: typeof body.subject === 'string' ? body.subject : undefined,
+      user_id: userId,
+    };
+
     // Check if Supabase is configured
     if (!isSupabaseConfigured()) {
       console.warn('Supabase not configured, returning mock response');
       return createApiResponse(
-        createMockTemplateResponse({ ...body, user_id: userId }),
+        createMockTemplateResponse(templateRequest),
         HTTP_STATUS.CREATED
       );
     }
@@ -225,13 +245,13 @@ export async function POST(request: Request): Promise<Response> {
     if (!supabase) {
       console.warn('Supabase client not available, returning mock response');
       return createApiResponse(
-        createMockTemplateResponse({ ...body, user_id: userId }),
+        createMockTemplateResponse(templateRequest),
         HTTP_STATUS.CREATED
       );
     }
 
     // Prepare data for database insertion
-    const templateData = prepareTemplateData({ ...body, user_id: userId });
+    const templateData = prepareTemplateData(templateRequest);
 
     // Insert template into database
     const { data: template, error } = await supabase

@@ -15,8 +15,6 @@ async function checkRateLimit(userId: string, limit: number, windowMs: number): 
 }> {
   const key = `import:${userId}`;
   const now = Date.now();
-  const windowStart = now - windowMs;
-  
   // Get current rate limit info
   let rateLimitInfo = rateLimitCache.get(key);
   
